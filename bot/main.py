@@ -136,6 +136,37 @@ async def handle_notify_order(request: web.Request) -> web.Response:
     return web.Response(text="OK")
 
 
+async def handle_notify_client(request: web.Request) -> web.Response:
+    """Send a Telegram message to a specific client by TG ID."""
+    secret = request.headers.get("X-Notify-Secret", "")
+    if NOTIFY_SECRET and secret != NOTIFY_SECRET:
+        return web.Response(status=403, text="Forbidden")
+    try:
+        data = await request.json()
+    except Exception:
+        return web.Response(status=400, text="Bad JSON")
+
+    tg_id = data.get("tg_id")
+    text = data.get("text", "")
+    if not tg_id or not text:
+        return web.Response(status=400, text="Missing tg_id or text")
+
+    kb_data = data.get("webapp_button")
+    kb = None
+    if kb_data:
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text=kb_data["label"], web_app=WebAppInfo(url=kb_data["url"]))
+        ]])
+
+    try:
+        await bot.send_message(int(tg_id), text, parse_mode="HTML", reply_markup=kb)
+    except Exception as e:
+        logger.error("notify_client error for tg_id=%s: %s", tg_id, e)
+        return web.Response(status=500, text="Bot error")
+
+    return web.Response(text="OK")
+
+
 # ── CORS middleware ───────────────────────────────────────────────────────────
 
 @web.middleware
@@ -157,7 +188,9 @@ async def main() -> None:
     app = web.Application(middlewares=[cors_middleware])
     app.router.add_get("/api/products", handle_products)
     app.router.add_post("/notify_order", handle_notify_order)
+    app.router.add_post("/notify_client", handle_notify_client)
     app.router.add_options("/notify_order", lambda _: web.Response())
+    app.router.add_options("/notify_client", lambda _: web.Response())
 
     runner = web.AppRunner(app)
     await runner.setup()

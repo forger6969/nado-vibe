@@ -23,6 +23,19 @@ export interface Order {
   address: string
   status: 'new' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
   price: number
+  courier_name?: string
+  courier_phone?: string
+  confirmed?: boolean
+  created_at: string
+}
+
+export interface Review {
+  id: string
+  order_id: string
+  buyer_tg_id: number
+  rating: number
+  text?: string
+  photo_url?: string
   created_at: string
 }
 

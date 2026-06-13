@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import type { Product, Order, OrderStatus } from '../types'
+import type { Product, Order, OrderStatus, Review } from '../types'
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? ''
 const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
@@ -70,6 +70,29 @@ export async function getMyOrders(tgId: number): Promise<Order[]> {
     .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
+}
+
+export async function shipOrder(id: string, courier_name: string, courier_phone: string): Promise<void> {
+  const { error } = await supabase
+    .from('orders')
+    .update({ status: 'shipped', courier_name, courier_phone })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function confirmDelivery(orderId: string): Promise<void> {
+  const { error } = await supabase.from('orders').update({ confirmed: true, status: 'delivered' }).eq('id', orderId)
+  if (error) throw error
+}
+
+export async function createReview(r: Omit<Review, 'id' | 'created_at'>): Promise<void> {
+  const { error } = await supabase.from('reviews').insert(r)
+  if (error) throw error
+}
+
+export async function getOrderReview(orderId: string): Promise<Review | null> {
+  const { data } = await supabase.from('reviews').select('*').eq('order_id', orderId).single()
+  return data ?? null
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus): Promise<void> {

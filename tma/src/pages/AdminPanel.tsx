@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Package, ClipboardList, Trash2, Edit2, ChevronDown } from 'lucide-react'
-import { getProducts, getOrders, deleteProduct, updateOrderStatus } from '../lib/supabase'
+import { getProducts, getOrders, deleteProduct, updateOrderStatus, shipOrder } from '../lib/supabase'
 import type { Product, Order, OrderStatus } from '../types'
 import { STATUS_LABELS, STATUS_COLORS } from '../types'
 import { ProductForm } from '../components/ProductForm'
+import { CourierForm } from '../components/CourierForm'
+import { notifyClient } from '../lib/botNotify'
 
 type Tab = 'products' | 'orders'
+
+const TMA_URL = import.meta.env.VITE_TMA_URL as string | undefined
 
 export function AdminPanel() {
   const [tab, setTab] = useState<Tab>('products')
@@ -15,6 +19,7 @@ export function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
+  const [courierOrder, setCourierOrder] = useState<Order | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -32,9 +37,36 @@ export function AdminPanel() {
     setProducts(prev => prev.filter(p => p.id !== id))
   }
 
-  const handleStatusChange = async (orderId: string, status: OrderStatus) => {
-    await updateOrderStatus(orderId, status)
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o))
+  const handleStatusChange = async (order: Order, status: OrderStatus) => {
+    if (status === 'shipped') {
+      setCourierOrder(order)
+      return
+    }
+    await updateOrderStatus(order.id, status)
+    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status } : o))
+
+    if (status === 'delivered' && order.buyer_tg_id) {
+      await notifyClient(
+        order.buyer_tg_id,
+        `📦 <b>Ваш заказ доставлен!</b>\n\n${order.product_name} (${order.size})\n\nПожалуйста, подтвердите получение и оставьте отзыв в магазине.`,
+        TMA_URL ? { label: '✅ Подтвердить получение', url: TMA_URL } : undefined,
+      )
+    }
+  }
+
+  const handleCourierConfirm = async (courier_name: string, courier_phone: string) => {
+    if (!courierOrder) return
+    await shipOrder(courierOrder.id, courier_name, courier_phone)
+    setOrders(prev => prev.map(o => o.id === courierOrder.id ? { ...o, status: 'shipped', courier_name, courier_phone } : o))
+
+    if (courierOrder.buyer_tg_id) {
+      await notifyClient(
+        courierOrder.buyer_tg_id,
+        `🚚 <b>Ваш заказ в пути!</b>\n\n${courierOrder.product_name} (${courierOrder.size})\n\n👤 Курьер: <b>${courier_name}</b>\n📞 Телефон: <b>${courier_phone}</b>\n\nКурьер свяжется с вами для уточнения деталей доставки.`,
+        TMA_URL ? { label: '📋 Мои заказы', url: TMA_URL } : undefined,
+      )
+    }
+    setCourierOrder(null)
   }
 
   const newOrders = orders.filter(o => o.status === 'new').length
@@ -107,13 +139,20 @@ export function AdminPanel() {
         )}
       </div>
 
-      {/* Product form modal */}
+      {/* Modals */}
       <AnimatePresence>
         {showForm && (
           <ProductForm
             product={editProduct}
             onClose={() => setShowForm(false)}
             onSaved={() => { setShowForm(false); load() }}
+          />
+        )}
+        {courierOrder && (
+          <CourierForm
+            orderName={`${courierOrder.product_name} · ${courierOrder.size}`}
+            onConfirm={handleCourierConfirm}
+            onClose={() => setCourierOrder(null)}
           />
         )}
       </AnimatePresence>
@@ -188,7 +227,7 @@ function ProductsList({ products, onEdit, onDelete }: {
 
 function OrdersList({ orders, onStatusChange }: {
   orders: Order[]
-  onStatusChange: (id: string, status: OrderStatus) => void
+  onStatusChange: (order: Order, status: OrderStatus) => void
 }) {
   const statuses: OrderStatus[] = ['new', 'processing', 'shipped', 'delivered', 'cancelled']
 
@@ -223,6 +262,12 @@ function OrdersList({ orders, onStatusChange }: {
             )}
             <p className="font-body text-white/40 text-xs">📞 {o.phone}</p>
             <p className="font-body text-white/40 text-xs">📍 {o.address}</p>
+            {o.courier_name && (
+              <p className="font-body text-blue-400/70 text-xs">🚚 {o.courier_name} · {o.courier_phone}</p>
+            )}
+            {o.confirmed && (
+              <p className="font-mono text-green-400/70 text-[9px] tracking-wide">✅ Клиент подтвердил получение</p>
+            )}
             <p className="font-mono text-white/20 text-[9px]">{new Date(o.created_at).toLocaleString('ru')}</p>
           </div>
 
@@ -230,7 +275,7 @@ function OrdersList({ orders, onStatusChange }: {
           <div className="relative">
             <select
               value={o.status}
-              onChange={e => onStatusChange(o.id, e.target.value as OrderStatus)}
+              onChange={e => onStatusChange(o, e.target.value as OrderStatus)}
               className={`w-full appearance-none font-mono text-xs px-3 py-2 rounded-xl border-0 outline-none cursor-pointer ${STATUS_COLORS[o.status]}`}
             >
               {statuses.map(s => (

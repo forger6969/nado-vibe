@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { X, Upload, Loader2 } from 'lucide-react'
-import { createProduct, updateProduct, uploadProductImage } from '../lib/supabase'
+import { createProduct, updateProduct } from '../lib/supabase'
+import { uploadImage } from '../lib/cloudinary'
 import type { Product } from '../types'
 import { CATEGORIES } from '../types'
 
@@ -41,7 +42,7 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
     try {
       const localPreview = URL.createObjectURL(file)
       setImagePreview(localPreview)
-      const url = await uploadProductImage(file)
+      const url = await uploadImage(file)
       setImageUrl(url)
     } catch {
       setError('Ошибка загрузки фото')

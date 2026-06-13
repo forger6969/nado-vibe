@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { RefreshCw } from 'lucide-react'
 import { getMyOrders } from '../lib/supabase'
 import { getTgUser } from '../lib/tg'
 import type { Order, OrderStatus } from '../types'
 import { STATUS_LABELS } from '../types'
+import { ReviewForm } from '../components/ReviewForm'
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1]
 
@@ -29,6 +30,7 @@ const STATUS_STEPS: OrderStatus[] = ['new', 'processing', 'shipped', 'delivered'
 export function MyOrders() {
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [reviewOrder, setReviewOrder] = useState<Order | null>(null)
   const user = getTgUser()
 
   const load = () => {
@@ -97,6 +99,20 @@ export function MyOrders() {
                   <p className="font-mono text-white font-bold text-sm shrink-0">{o.price.toLocaleString()} сум</p>
                 </div>
 
+                {/* Courier info (if shipped) */}
+                {o.status === 'shipped' && o.courier_name && (
+                  <div className="bg-blue-500/8 border border-blue-500/15 rounded-xl p-3 mb-3">
+                    <p className="font-mono text-blue-300/70 text-[9px] tracking-[0.2em] uppercase mb-1.5">Курьер</p>
+                    <p className="font-display font-semibold text-white text-sm">{o.courier_name}</p>
+                    <a
+                      href={`tel:${o.courier_phone}`}
+                      className="font-mono text-blue-400 text-xs mt-0.5 block"
+                    >
+                      {o.courier_phone}
+                    </a>
+                  </div>
+                )}
+
                 {/* Status + date */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -113,7 +129,7 @@ export function MyOrders() {
 
               {/* Progress bar — only for non-cancelled */}
               {o.status !== 'cancelled' && (
-                <div className="px-4 pb-4">
+                <div className="px-4 pb-3">
                   <div className="flex items-center gap-1">
                     {STATUS_STEPS.map((step, idx) => {
                       const stepIdx = STATUS_STEPS.indexOf(o.status as OrderStatus)
@@ -155,10 +171,43 @@ export function MyOrders() {
                   </div>
                 </div>
               )}
+
+              {/* Confirm delivery button */}
+              {o.status === 'delivered' && !o.confirmed && (
+                <div className="px-4 pb-4">
+                  <motion.button
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.06 + 0.2 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setReviewOrder(o)}
+                    className="w-full bg-green-500/15 border border-green-500/25 text-green-400 font-display font-semibold text-xs tracking-wider py-3 rounded-xl flex items-center justify-center gap-2"
+                  >
+                    ✅ Подтвердить получение и оставить отзыв
+                  </motion.button>
+                </div>
+              )}
+
+              {/* Already confirmed */}
+              {o.status === 'delivered' && o.confirmed && (
+                <div className="px-4 pb-4">
+                  <p className="font-mono text-green-400/40 text-[9px] tracking-wide text-center">✓ Получение подтверждено · Спасибо за отзыв!</p>
+                </div>
+              )}
             </motion.div>
           ))}
         </div>
       )}
+
+      <AnimatePresence>
+        {reviewOrder && (
+          <ReviewForm
+            order={reviewOrder}
+            onClose={() => setReviewOrder(null)}
+            onDone={() => { setReviewOrder(null); load() }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
