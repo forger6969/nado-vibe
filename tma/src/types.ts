@@ -4,6 +4,7 @@ export interface Product {
   category: string
   price: number
   sizes: string[]
+  sizes_stock?: Record<string, number>
   description?: string
   image_url?: string
   stock: number

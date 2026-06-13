@@ -21,8 +21,11 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
   const [name, setName] = useState(product?.name ?? '')
   const [category, setCategory] = useState(product?.category ?? CATEGORIES[0])
   const [price, setPrice] = useState(String(product?.price ?? ''))
-  const [stock, setStock] = useState(String(product?.stock ?? '0'))
-  const [sizes, setSizes] = useState<string[]>(product?.sizes ?? [])
+  const [sizesStock, setSizesStock] = useState<Record<string, number>>(() => {
+    if (product?.sizes_stock && Object.keys(product.sizes_stock).length > 0) return product.sizes_stock
+    if (product?.sizes?.length) return Object.fromEntries(product.sizes.map(s => [s, 0]))
+    return {}
+  })
   const [description, setDescription] = useState(product?.description ?? '')
   const [imageUrl, setImageUrl] = useState(product?.image_url ?? '')
   const [imagePreview, setImagePreview] = useState(product?.image_url ?? '')
@@ -32,7 +35,14 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
   const [error, setError] = useState('')
 
   const toggleSize = (s: string) =>
-    setSizes(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s])
+    setSizesStock(prev =>
+      s in prev
+        ? Object.fromEntries(Object.entries(prev).filter(([k]) => k !== s))
+        : { ...prev, [s]: 0 }
+    )
+
+  const setSizeQty = (s: string, qty: number) =>
+    setSizesStock(prev => ({ ...prev, [s]: Math.max(0, qty) }))
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -53,7 +63,8 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
   }
 
   const submit = async () => {
-    if (!name.trim() || !price || sizes.length === 0) {
+    const selectedSizes = Object.keys(sizesStock)
+    if (!name.trim() || !price || selectedSizes.length === 0) {
       setError('Заполните название, цену и выберите размеры')
       return
     }
@@ -61,12 +72,14 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
     setLoading(true)
     setError('')
     try {
+      const stock = Object.values(sizesStock).reduce((a, b) => a + b, 0)
       const data = {
         name: name.trim(),
         category,
         price: parseInt(price),
-        stock: parseInt(stock) || 0,
-        sizes,
+        stock,
+        sizes: selectedSizes,
+        sizes_stock: sizesStock,
         description: description.trim() || undefined,
         image_url: imageUrl || undefined,
         active,
@@ -159,35 +172,47 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
             </select>
           </FormField>
 
-          {/* Price + Stock row */}
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <FormField label="Цена (сум) *">
-                <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="149000" className="input-field" />
-              </FormField>
-            </div>
-            <div className="w-28">
-              <FormField label="В наличии">
-                <input type="number" min="0" value={stock} onChange={e => setStock(e.target.value)} placeholder="0" className="input-field" />
-              </FormField>
-            </div>
-          </div>
+          {/* Price */}
+          <FormField label="Цена (сум) *">
+            <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="149000" className="input-field" />
+          </FormField>
 
-          {/* Sizes */}
-          <FormField label="Размеры *">
-            <div className="flex flex-wrap gap-2 mt-1">
+          {/* Sizes + stock per size */}
+          <FormField label="Размеры и количество *">
+            <div className="flex flex-wrap gap-2 mt-1 mb-3">
               {ALL_SIZES.map(s => (
                 <button
                   key={s}
                   onClick={() => toggleSize(s)}
                   className={`font-mono text-xs px-3 py-1.5 rounded-lg border transition-all ${
-                    sizes.includes(s) ? 'bg-white text-black border-white' : 'text-white/40 border-white/10'
+                    s in sizesStock ? 'bg-white text-black border-white' : 'text-white/40 border-white/10'
                   }`}
                 >
                   {s}
                 </button>
               ))}
             </div>
+            {Object.keys(sizesStock).length > 0 && (
+              <div className="flex flex-col gap-2">
+                {Object.keys(sizesStock).map(s => (
+                  <div key={s} className="flex items-center gap-3">
+                    <span className="font-mono text-white text-xs w-10 shrink-0">{s}</span>
+                    <input
+                      type="number"
+                      min="0"
+                      value={sizesStock[s]}
+                      onChange={e => setSizeQty(s, parseInt(e.target.value) || 0)}
+                      className="input-field"
+                      placeholder="0"
+                    />
+                    <span className="font-mono text-white/30 text-xs shrink-0">шт</span>
+                  </div>
+                ))}
+                <p className="font-mono text-white/20 text-[9px] text-right mt-1">
+                  Итого: {Object.values(sizesStock).reduce((a, b) => a + b, 0)} шт
+                </p>
+              </div>
+            )}
           </FormField>
 
           {/* Description */}

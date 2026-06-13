@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Package, ClipboardList, Trash2, Edit2, ChevronDown, ShoppingBag } from 'lucide-react'
+import { Plus, Package, ClipboardList, Trash2, Edit2, ChevronDown, ShoppingBag, PackagePlus } from 'lucide-react'
 import { getProducts, getOrders, deleteProduct, updateOrderStatus, shipOrder } from '../lib/supabase'
 import type { Product, Order, OrderStatus } from '../types'
 import { STATUS_LABELS, STATUS_COLORS } from '../types'
 import { ProductForm } from '../components/ProductForm'
 import { CourierForm } from '../components/CourierForm'
+import { RestockSheet } from '../components/RestockSheet'
 import { notifyClient } from '../lib/botNotify'
 
 type Tab = 'products' | 'orders'
@@ -65,6 +66,7 @@ export function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
+  const [restockProduct, setRestockProduct] = useState<Product | null>(null)
   const [courierGroup, setCourierGroup] = useState<CartGroup | null>(null)
 
   const load = async () => {
@@ -188,6 +190,7 @@ export function AdminPanel() {
             products={products}
             onEdit={p => { setEditProduct(p); setShowForm(true) }}
             onDelete={handleDelete}
+            onRestock={p => setRestockProduct(p)}
           />
         ) : (
           <OrdersList groups={cartGroups} onStatusChange={handleStatusChange} />
@@ -201,6 +204,13 @@ export function AdminPanel() {
             product={editProduct}
             onClose={() => setShowForm(false)}
             onSaved={() => { setShowForm(false); load() }}
+          />
+        )}
+        {restockProduct && (
+          <RestockSheet
+            product={restockProduct}
+            onClose={() => setRestockProduct(null)}
+            onRestocked={() => { setRestockProduct(null); load() }}
           />
         )}
         {courierGroup && (
@@ -217,10 +227,11 @@ export function AdminPanel() {
   )
 }
 
-function ProductsList({ products, onEdit, onDelete }: {
+function ProductsList({ products, onEdit, onDelete, onRestock }: {
   products: Product[]
   onEdit: (p: Product) => void
   onDelete: (id: string) => void
+  onRestock: (p: Product) => void
 }) {
   if (products.length === 0) {
     return (
@@ -256,7 +267,7 @@ function ProductsList({ products, onEdit, onDelete }: {
               </div>
               <p className="font-mono text-white text-xs font-bold shrink-0">{p.price.toLocaleString()}</p>
             </div>
-            <div className="flex items-center gap-2 mt-1.5">
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               {!p.active && (
                 <span className="font-mono text-[8px] text-red-400 border border-red-400/20 px-1.5 py-0.5 rounded-full">скрыт</span>
               )}
@@ -265,10 +276,26 @@ function ProductsList({ products, onEdit, onDelete }: {
               }`}>
                 {p.stock === 0 ? 'нет в наличии' : `${p.stock} шт`}
               </span>
-              <span className="font-mono text-white/20 text-[9px]">{p.sizes.join(' · ')}</span>
             </div>
+            {p.sizes_stock && Object.keys(p.sizes_stock).length > 0 && (
+              <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                {p.sizes.map(s => {
+                  const qty = p.sizes_stock?.[s] ?? 0
+                  return (
+                    <span key={s} className={`font-mono text-[8px] px-1.5 py-0.5 rounded-lg ${
+                      qty === 0 ? 'text-white/15 bg-white/3' : 'text-white/50 bg-white/5'
+                    }`}>
+                      {s}: {qty}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
           </div>
           <div className="flex gap-2 shrink-0">
+            <button onClick={() => onRestock(p)} className="w-8 h-8 rounded-xl border border-white/10 flex items-center justify-center" title="Пополнить">
+              <PackagePlus size={12} className="text-white/40" />
+            </button>
             <button onClick={() => onEdit(p)} className="w-8 h-8 rounded-xl border border-white/10 flex items-center justify-center">
               <Edit2 size={12} className="text-white/40" />
             </button>

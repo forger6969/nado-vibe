@@ -92,20 +92,33 @@ export function ProductSheet({ product, onClose }: Props) {
               <div className="mb-6">
                 <p className="font-mono text-white/30 text-[9px] tracking-[0.2em] uppercase mb-3">Выбери размер</p>
                 <div className="flex gap-2 flex-wrap">
-                  {product.sizes.map(s => (
-                    <motion.button
-                      key={s}
-                      whileTap={{ scale: 0.92 }}
-                      onClick={() => setSelectedSize(s)}
-                      className={`font-mono text-xs px-4 py-2 rounded-xl border transition-all ${
-                        selectedSize === s
-                          ? 'bg-white text-black border-white'
-                          : 'text-white/50 border-white/15 active:border-white/40'
-                      }`}
-                    >
-                      {s}
-                    </motion.button>
-                  ))}
+                  {product.sizes.map(s => {
+                    const qty = product.sizes_stock?.[s]
+                    const outOfStock = qty !== undefined && qty === 0
+                    return (
+                      <motion.button
+                        key={s}
+                        whileTap={outOfStock ? undefined : { scale: 0.92 }}
+                        onClick={() => !outOfStock && setSelectedSize(s)}
+                        disabled={outOfStock}
+                        className={`font-mono text-xs px-4 py-2 rounded-xl border transition-all flex flex-col items-center gap-0.5 ${
+                          outOfStock
+                            ? 'text-white/15 border-white/5 cursor-not-allowed line-through'
+                            : selectedSize === s
+                              ? 'bg-white text-black border-white'
+                              : 'text-white/50 border-white/15 active:border-white/40'
+                        }`}
+                      >
+                        <span>{s}</span>
+                        {qty !== undefined && !outOfStock && (
+                          <span className="text-[8px] opacity-50 leading-none">{qty} шт</span>
+                        )}
+                        {outOfStock && (
+                          <span className="text-[8px] opacity-50 leading-none">нет</span>
+                        )}
+                      </motion.button>
+                    )
+                  })}
                 </div>
               </div>
 

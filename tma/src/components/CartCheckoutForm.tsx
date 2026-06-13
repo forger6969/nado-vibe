@@ -61,7 +61,12 @@ export function CartCheckoutForm({ onClose }: Props) {
         price: item.product.price * item.qty,
         cart_id: cartId,
       }))
-      const created = await createOrders(payload, cartId)
+      const sizeQtys = items.map(item => ({
+        productId: item.product.id,
+        size: item.size,
+        qty: item.qty,
+      }))
+      const created = await createOrders(payload, cartId, sizeQtys)
       tg?.HapticFeedback?.notificationOccurred('success')
       void notifyBot(created)
       clear()

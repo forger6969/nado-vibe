@@ -53,13 +53,54 @@ export async function createOrder(o: Omit<Order, 'id' | 'created_at' | 'status'>
   return data
 }
 
-export async function createOrders(list: Omit<Order, 'id' | 'created_at' | 'status'>[], cartId?: string): Promise<Order[]> {
+export async function createOrders(
+  list: Omit<Order, 'id' | 'created_at' | 'status'>[],
+  cartId?: string,
+  sizeQtys?: { productId: string; size: string; qty: number }[],
+): Promise<Order[]> {
   const { data, error } = await supabase
     .from('orders')
     .insert(list.map(o => ({ ...o, status: 'new', cart_id: cartId })))
     .select()
   if (error) throw error
+
+  // Decrement sizes_stock for each ordered item (best-effort)
+  if (sizeQtys && sizeQtys.length > 0) {
+    const byProduct = new Map<string, { size: string; qty: number }[]>()
+    for (const s of sizeQtys) {
+      const arr = byProduct.get(s.productId) ?? []
+      arr.push({ size: s.size, qty: s.qty })
+      byProduct.set(s.productId, arr)
+    }
+    await Promise.allSettled(
+      Array.from(byProduct.entries()).map(async ([productId, sizes]) => {
+        const { data: p } = await supabase.from('products').select('sizes_stock,stock').eq('id', productId).single()
+        if (!p) return
+        const stock: Record<string, number> = { ...(p.sizes_stock ?? {}) }
+        for (const { size, qty } of sizes) {
+          stock[size] = Math.max(0, (stock[size] ?? 0) - qty)
+        }
+        const total = Object.values(stock).reduce((a, b) => a + b, 0)
+        await supabase.from('products').update({ sizes_stock: stock, stock: total }).eq('id', productId)
+      })
+    )
+  }
+
   return data ?? []
+}
+
+export async function restockProduct(id: string, delta: Record<string, number>): Promise<void> {
+  const { data: p } = await supabase.from('products').select('sizes_stock,stock,sizes').eq('id', id).single()
+  if (!p) throw new Error('Product not found')
+  const stock: Record<string, number> = { ...(p.sizes_stock ?? {}) }
+  const sizes = new Set<string>(p.sizes ?? [])
+  for (const [size, qty] of Object.entries(delta)) {
+    if (qty <= 0) continue
+    stock[size] = (stock[size] ?? 0) + qty
+    sizes.add(size)
+  }
+  const total = Object.values(stock).reduce((a, b) => a + b, 0)
+  await supabase.from('products').update({ sizes_stock: stock, stock: total, sizes: Array.from(sizes) }).eq('id', id)
 }
 
 export async function getMyOrders(tgId: number): Promise<Order[]> {
