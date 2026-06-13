@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: nado-vibe-bot
+    runtime: python
+    repo: https://github.com/forger6969/nado-vibe
+    branch: main
+    rootDir: bot
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    plan: free
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_CHAT_ID
+        sync: false
+      - key: WEBAPP_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: NOTIFY_SECRET
+        sync: false
+      - key: PORT
+        value: 10000
