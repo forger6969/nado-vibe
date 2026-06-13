@@ -23,6 +23,7 @@ export interface Order {
   address: string
   status: 'new' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
   price: number
+  cart_id?: string
   courier_name?: string
   courier_phone?: string
   confirmed?: boolean

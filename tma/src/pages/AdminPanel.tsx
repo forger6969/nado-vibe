@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Package, ClipboardList, Trash2, Edit2, ChevronDown } from 'lucide-react'
+import { Plus, Package, ClipboardList, Trash2, Edit2, ChevronDown, ShoppingBag } from 'lucide-react'
 import { getProducts, getOrders, deleteProduct, updateOrderStatus, shipOrder } from '../lib/supabase'
 import type { Product, Order, OrderStatus } from '../types'
 import { STATUS_LABELS, STATUS_COLORS } from '../types'
@@ -12,6 +12,52 @@ type Tab = 'products' | 'orders'
 
 const TMA_URL = import.meta.env.VITE_TMA_URL as string | undefined
 
+/** Группа заказов из одной корзины */
+interface CartGroup {
+  cart_id: string
+  items: Order[]
+  buyer_name?: string
+  buyer_username?: string
+  buyer_tg_id: number
+  phone: string
+  address: string
+  total: number
+  status: OrderStatus
+  courier_name?: string
+  courier_phone?: string
+  confirmed?: boolean
+  created_at: string
+}
+
+function groupByCarts(orders: Order[]): CartGroup[] {
+  const map = new Map<string, Order[]>()
+  // Orders without cart_id get their own synthetic group per id
+  for (const o of orders) {
+    const key = o.cart_id ?? o.id
+    const arr = map.get(key) ?? []
+    arr.push(o)
+    map.set(key, arr)
+  }
+  return Array.from(map.values()).map(items => {
+    const first = items[0]
+    return {
+      cart_id: first.cart_id ?? first.id,
+      items,
+      buyer_name: first.buyer_name,
+      buyer_username: first.buyer_username,
+      buyer_tg_id: first.buyer_tg_id,
+      phone: first.phone,
+      address: first.address,
+      total: items.reduce((s, o) => s + o.price, 0),
+      status: first.status,
+      courier_name: first.courier_name,
+      courier_phone: first.courier_phone,
+      confirmed: first.confirmed,
+      created_at: first.created_at,
+    }
+  }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+}
+
 export function AdminPanel() {
   const [tab, setTab] = useState<Tab>('products')
   const [products, setProducts] = useState<Product[]>([])
@@ -19,7 +65,7 @@ export function AdminPanel() {
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editProduct, setEditProduct] = useState<Product | null>(null)
-  const [courierOrder, setCourierOrder] = useState<Order | null>(null)
+  const [courierGroup, setCourierGroup] = useState<CartGroup | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -31,45 +77,54 @@ export function AdminPanel() {
 
   useEffect(() => { load() }, [])
 
+  const cartGroups = useMemo(() => groupByCarts(orders), [orders])
+
   const handleDelete = async (id: string) => {
     if (!confirm('Удалить товар?')) return
     await deleteProduct(id)
     setProducts(prev => prev.filter(p => p.id !== id))
   }
 
-  const handleStatusChange = async (order: Order, status: OrderStatus) => {
+  const handleStatusChange = async (group: CartGroup, status: OrderStatus) => {
     if (status === 'shipped') {
-      setCourierOrder(order)
+      setCourierGroup(group)
       return
     }
-    await updateOrderStatus(order.id, status)
-    setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status } : o))
+    // Apply status to all items in the cart
+    await Promise.all(group.items.map(o => updateOrderStatus(o.id, status)))
+    setOrders(prev => prev.map(o =>
+      group.items.some(gi => gi.id === o.id) ? { ...o, status } : o
+    ))
 
-    if (status === 'delivered' && order.buyer_tg_id) {
+    if (status === 'delivered' && group.buyer_tg_id) {
+      const itemsText = group.items.map(o => `• ${o.product_name} (${o.size})`).join('\n')
       await notifyClient(
-        order.buyer_tg_id,
-        `📦 <b>Ваш заказ доставлен!</b>\n\n${order.product_name} (${order.size})\n\nПожалуйста, подтвердите получение и оставьте отзыв в магазине.`,
+        group.buyer_tg_id,
+        `📦 <b>Ваш заказ доставлен!</b>\n\n${itemsText}\n\nПожалуйста, подтвердите получение и оставьте отзыв в магазине.`,
         TMA_URL ? { label: '✅ Подтвердить получение', url: TMA_URL } : undefined,
       )
     }
   }
 
   const handleCourierConfirm = async (courier_name: string, courier_phone: string) => {
-    if (!courierOrder) return
-    await shipOrder(courierOrder.id, courier_name, courier_phone)
-    setOrders(prev => prev.map(o => o.id === courierOrder.id ? { ...o, status: 'shipped', courier_name, courier_phone } : o))
+    if (!courierGroup) return
+    await Promise.all(courierGroup.items.map(o => shipOrder(o.id, courier_name, courier_phone)))
+    setOrders(prev => prev.map(o =>
+      courierGroup.items.some(gi => gi.id === o.id) ? { ...o, status: 'shipped', courier_name, courier_phone } : o
+    ))
 
-    if (courierOrder.buyer_tg_id) {
+    if (courierGroup.buyer_tg_id) {
+      const itemsText = courierGroup.items.map(o => `• ${o.product_name} (${o.size})`).join('\n')
       await notifyClient(
-        courierOrder.buyer_tg_id,
-        `🚚 <b>Ваш заказ в пути!</b>\n\n${courierOrder.product_name} (${courierOrder.size})\n\n👤 Курьер: <b>${courier_name}</b>\n📞 Телефон: <b>${courier_phone}</b>\n\nКурьер свяжется с вами для уточнения деталей доставки.`,
+        courierGroup.buyer_tg_id,
+        `🚚 <b>Ваш заказ в пути!</b>\n\n${itemsText}\n\n👤 Курьер: <b>${courier_name}</b>\n📞 Телефон: <b>${courier_phone}</b>\n\nКурьер свяжется с вами для уточнения деталей доставки.`,
         TMA_URL ? { label: '📋 Мои заказы', url: TMA_URL } : undefined,
       )
     }
-    setCourierOrder(null)
+    setCourierGroup(null)
   }
 
-  const newOrders = orders.filter(o => o.status === 'new').length
+  const newOrders = cartGroups.filter(g => g.status === 'new').length
 
   return (
     <div className="min-h-screen bg-black pb-6">
@@ -135,7 +190,7 @@ export function AdminPanel() {
             onDelete={handleDelete}
           />
         ) : (
-          <OrdersList orders={orders} onStatusChange={handleStatusChange} />
+          <OrdersList groups={cartGroups} onStatusChange={handleStatusChange} />
         )}
       </div>
 
@@ -148,11 +203,13 @@ export function AdminPanel() {
             onSaved={() => { setShowForm(false); load() }}
           />
         )}
-        {courierOrder && (
+        {courierGroup && (
           <CourierForm
-            orderName={`${courierOrder.product_name} · ${courierOrder.size}`}
+            orderName={courierGroup.items.length > 1
+              ? `${courierGroup.items.length} товара · ${courierGroup.total.toLocaleString()} сум`
+              : `${courierGroup.items[0].product_name} · ${courierGroup.items[0].size}`}
             onConfirm={handleCourierConfirm}
-            onClose={() => setCourierOrder(null)}
+            onClose={() => setCourierGroup(null)}
           />
         )}
       </AnimatePresence>
@@ -225,13 +282,13 @@ function ProductsList({ products, onEdit, onDelete }: {
   )
 }
 
-function OrdersList({ orders, onStatusChange }: {
-  orders: Order[]
-  onStatusChange: (order: Order, status: OrderStatus) => void
+function OrdersList({ groups, onStatusChange }: {
+  groups: CartGroup[]
+  onStatusChange: (group: CartGroup, status: OrderStatus) => void
 }) {
   const statuses: OrderStatus[] = ['new', 'processing', 'shipped', 'delivered', 'cancelled']
 
-  if (orders.length === 0) {
+  if (groups.length === 0) {
     return (
       <div className="text-center py-16">
         <p className="font-display text-white/20 text-base">Заказов нет</p>
@@ -240,43 +297,64 @@ function OrdersList({ orders, onStatusChange }: {
   }
   return (
     <div className="flex flex-col gap-3">
-      {orders.map((o, i) => (
+      {groups.map((g, i) => (
         <motion.div
-          key={o.id}
+          key={g.cart_id}
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: i * 0.04, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] }}
           className="card-dark rounded-2xl p-4"
         >
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div>
-              <p className="font-display font-semibold text-white text-sm tracking-wide">{o.product_name}</p>
-              <p className="font-mono text-white/30 text-[9px] tracking-wider mt-0.5">Размер: {o.size}</p>
+          {/* Cart header */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center">
+                <ShoppingBag size={12} className="text-white/40" />
+              </div>
+              <div>
+                <p className="font-mono text-white/20 text-[8px] tracking-[0.2em] uppercase">
+                  Корзина · {g.items.length} {g.items.length === 1 ? 'товар' : 'товара'}
+                </p>
+                <p className="font-mono text-white/15 text-[8px]">{new Date(g.created_at).toLocaleString('ru')}</p>
+              </div>
             </div>
-            <p className="font-mono text-white text-xs font-bold shrink-0">{o.price.toLocaleString()} сум</p>
+            <p className="font-mono text-white font-bold text-sm">{g.total.toLocaleString()} сум</p>
           </div>
 
+          {/* Items list */}
+          <div className="bg-white/3 rounded-xl p-3 mb-3 flex flex-col gap-2">
+            {g.items.map(o => (
+              <div key={o.id} className="flex items-center justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="font-display font-medium text-white text-xs tracking-wide truncate">{o.product_name}</p>
+                  <p className="font-mono text-white/30 text-[8px]">Размер {o.size}</p>
+                </div>
+                <p className="font-mono text-white/50 text-xs shrink-0 ml-2">{o.price.toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Buyer info */}
           <div className="flex flex-col gap-1 mb-3">
-            {o.buyer_name && (
-              <p className="font-body text-white/40 text-xs">👤 {o.buyer_name}{o.buyer_username ? ` @${o.buyer_username}` : ''}</p>
+            {g.buyer_name && (
+              <p className="font-body text-white/40 text-xs">👤 {g.buyer_name}{g.buyer_username ? ` @${g.buyer_username}` : ''}</p>
             )}
-            <p className="font-body text-white/40 text-xs">📞 {o.phone}</p>
-            <p className="font-body text-white/40 text-xs">📍 {o.address}</p>
-            {o.courier_name && (
-              <p className="font-body text-blue-400/70 text-xs">🚚 {o.courier_name} · {o.courier_phone}</p>
+            <p className="font-body text-white/40 text-xs">📞 {g.phone}</p>
+            <p className="font-body text-white/40 text-xs">📍 {g.address}</p>
+            {g.courier_name && (
+              <p className="font-body text-blue-400/70 text-xs">🚚 {g.courier_name} · {g.courier_phone}</p>
             )}
-            {o.confirmed && (
+            {g.confirmed && (
               <p className="font-mono text-green-400/70 text-[9px] tracking-wide">✅ Клиент подтвердил получение</p>
             )}
-            <p className="font-mono text-white/20 text-[9px]">{new Date(o.created_at).toLocaleString('ru')}</p>
           </div>
 
           {/* Status select */}
           <div className="relative">
             <select
-              value={o.status}
-              onChange={e => onStatusChange(o, e.target.value as OrderStatus)}
-              className={`w-full appearance-none font-mono text-xs px-3 py-2 rounded-xl border-0 outline-none cursor-pointer ${STATUS_COLORS[o.status]}`}
+              value={g.status}
+              onChange={e => onStatusChange(g, e.target.value as OrderStatus)}
+              className={`w-full appearance-none font-mono text-xs px-3 py-2 rounded-xl border-0 outline-none cursor-pointer ${STATUS_COLORS[g.status]}`}
             >
               {statuses.map(s => (
                 <option key={s} value={s} className="bg-[#111] text-white">

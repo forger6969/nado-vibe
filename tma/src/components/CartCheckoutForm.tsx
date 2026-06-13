@@ -9,13 +9,22 @@ import type { Order } from '../types'
 const BOT_URL = import.meta.env.VITE_BOT_NOTIFY_URL as string | undefined
 const SECRET = import.meta.env.VITE_NOTIFY_SECRET as string | undefined
 
-async function notifyBot(order: Order) {
-  if (!BOT_URL) return
+async function notifyBot(orders: Order[]) {
+  if (!BOT_URL || orders.length === 0) return
+  const first = orders[0]
+  const itemsText = orders.map(o => `• ${o.product_name} (${o.size}) — ${o.price.toLocaleString()} сум`).join('\n')
+  const total = orders.reduce((s, o) => s + o.price, 0)
   try {
     await fetch(BOT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...(SECRET ? { 'X-Notify-Secret': SECRET } : {}) },
-      body: JSON.stringify(order),
+      body: JSON.stringify({
+        ...first,
+        product_name: `Корзина (${orders.length} товара)`,
+        cart_items: itemsText,
+        price: total,
+        cart_id: first.cart_id,
+      }),
     })
   } catch { /* best-effort */ }
 }
@@ -39,9 +48,10 @@ export function CartCheckoutForm({ onClose }: Props) {
     setLoading(true)
     setError('')
     try {
+      const cartId = crypto.randomUUID()
       const payload = items.map(item => ({
         product_id: item.product.id,
-        product_name: `${item.product.name} ×${item.qty}`,
+        product_name: item.product.name,
         size: item.size,
         buyer_tg_id: user?.id ?? 0,
         buyer_name: name.trim() || undefined,
@@ -49,11 +59,11 @@ export function CartCheckoutForm({ onClose }: Props) {
         phone: phone.trim(),
         address: address.trim(),
         price: item.product.price * item.qty,
+        cart_id: cartId,
       }))
-      const created = await createOrders(payload)
+      const created = await createOrders(payload, cartId)
       tg?.HapticFeedback?.notificationOccurred('success')
-      // notify bot for each order
-      for (const o of created) void notifyBot(o)
+      void notifyBot(created)
       clear()
       setDone(true)
     } catch {

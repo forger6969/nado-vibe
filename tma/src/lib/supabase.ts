@@ -53,10 +53,10 @@ export async function createOrder(o: Omit<Order, 'id' | 'created_at' | 'status'>
   return data
 }
 
-export async function createOrders(list: Omit<Order, 'id' | 'created_at' | 'status'>[]): Promise<Order[]> {
+export async function createOrders(list: Omit<Order, 'id' | 'created_at' | 'status'>[], cartId?: string): Promise<Order[]> {
   const { data, error } = await supabase
     .from('orders')
-    .insert(list.map(o => ({ ...o, status: 'new' })))
+    .insert(list.map(o => ({ ...o, status: 'new', cart_id: cartId })))
     .select()
   if (error) throw error
   return data ?? []
