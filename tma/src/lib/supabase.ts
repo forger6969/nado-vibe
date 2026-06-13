@@ -189,12 +189,12 @@ export async function getOrderStats() {
   for (const o of total) {
     const s = byProduct.get(o.product_id) ?? {
       product_id: o.product_id, product_name: o.product_name,
-      orders: 0, revenue: 0, sizes: {}, buyers: new Set<number>(),
+      orders: 0, revenue: 0, sizes: {} as Record<string, number>, buyers: new Set<number>(),
     }
     s.orders++
     s.revenue += o.price ?? 0
-    s.sizes[o.size] = (s.sizes[o.size] ?? 0) + 1
-    s.buyers.add(o.buyer_tg_id)
+    s.sizes[o.size as string] = (s.sizes[o.size as string] ?? 0) + 1
+    s.buyers.add(o.buyer_tg_id as number)
     byProduct.set(o.product_id, s)
   }
 

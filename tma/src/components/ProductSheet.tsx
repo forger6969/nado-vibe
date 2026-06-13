@@ -158,11 +158,10 @@ export function ProductSheet({ product, onClose }: Props) {
                   )}
                 </AnimatePresence>
               </motion.button>
-            </div>
 
               {/* Reviews */}
               {reviews.length > 0 && (
-                <div className="mt-2">
+                <div className="mt-5">
                   <div className="flex items-center gap-2 mb-3">
                     <p className="font-mono text-white/30 text-[9px] tracking-[0.2em] uppercase">Отзывы</p>
                     <span className="font-mono text-[9px] text-white/20">
