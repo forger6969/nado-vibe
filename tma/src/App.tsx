@@ -4,6 +4,7 @@ import { initTg, getTgUser } from './lib/tg'
 import { isAdmin } from './lib/supabase'
 import { ClientCatalog } from './pages/ClientCatalog'
 import { AdminPanel } from './pages/AdminPanel'
+import { CartProvider } from './context/CartContext'
 
 export default function App() {
   const [adminMode, setAdminMode] = useState(false)
@@ -30,5 +31,7 @@ export default function App() {
     )
   }
 
-  return adminMode ? <AdminPanel /> : <ClientCatalog />
+  return adminMode
+    ? <AdminPanel />
+    : <CartProvider><ClientCatalog /></CartProvider>
 }
