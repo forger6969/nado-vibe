@@ -145,7 +145,7 @@ export function Hero() {
             className="btn-outline px-8 py-4 rounded-full text-sm font-medium tracking-wider inline-flex items-center gap-3"
           >
             <Send size={16} />
-            Telegram канал
+            Telegram бот
           </motion.a>
         </motion.div>
 

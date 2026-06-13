@@ -53,7 +53,7 @@ export function CTASection() {
           transition={{ duration: 0.6, delay: 0.15 }}
           className="font-body text-white/40 text-base leading-relaxed mb-12 max-w-md mx-auto"
         >
-          Напиши нам в Telegram или Instagram — ответим в течение часа и подберём нужный размер
+          Оформи заказ через нашего Telegram бота или напиши в Instagram — ответим в течение часа
         </motion.p>
 
         <motion.div
@@ -70,7 +70,7 @@ export function CTASection() {
             className="btn-primary w-full sm:w-auto flex items-center justify-center gap-3 px-10 py-4 rounded-full text-sm font-semibold tracking-widest"
           >
             <Send size={16} />
-            Telegram канал
+            Telegram бот
           </a>
           <a
             href="https://www.instagram.com/nado_vibe/"
