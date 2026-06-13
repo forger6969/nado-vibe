@@ -164,6 +164,11 @@ function ProductsList({ products, onEdit, onDelete }: {
               {!p.active && (
                 <span className="font-mono text-[8px] text-red-400 border border-red-400/20 px-1.5 py-0.5 rounded-full">скрыт</span>
               )}
+              <span className={`font-mono text-[8px] px-1.5 py-0.5 rounded-full border ${
+                p.stock === 0 ? 'text-red-400 border-red-400/20' : 'text-green-400 border-green-400/20'
+              }`}>
+                {p.stock === 0 ? 'нет в наличии' : `${p.stock} шт`}
+              </span>
               <span className="font-mono text-white/20 text-[9px]">{p.sizes.join(' · ')}</span>
             </div>
           </div>

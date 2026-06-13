@@ -114,15 +114,26 @@ export function ClientCatalog() {
                     <span className="absolute top-2 left-2 font-mono text-[8px] tracking-wider text-white/30 border border-white/10 px-2 py-0.5 rounded-full">
                       {p.category}
                     </span>
+                    {/* Stock badge */}
+                    {p.stock === 0 && (
+                      <span className="absolute top-2 right-2 font-mono text-[8px] tracking-wider text-red-400 bg-black/60 px-1.5 py-0.5 rounded-full">
+                        нет
+                      </span>
+                    )}
                   </div>
                   {/* Info */}
                   <div className="p-3">
                     <p className="font-display font-semibold text-white text-xs tracking-wide mb-1 line-clamp-1">
                       {p.name}
                     </p>
-                    <p className="font-mono text-white font-bold text-xs">
-                      {p.price.toLocaleString()} сум
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <p className="font-mono text-white font-bold text-xs">
+                        {p.price.toLocaleString()} сум
+                      </p>
+                      {p.stock > 0 && (
+                        <p className="font-mono text-white/30 text-[8px]">{p.stock} шт</p>
+                      )}
+                    </div>
                     <div className="flex gap-1 flex-wrap mt-2">
                       {p.sizes.slice(0, 4).map(s => (
                         <span key={s} className="font-mono text-[8px] text-white/30 border border-white/8 px-1.5 py-0.5 rounded">

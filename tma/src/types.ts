@@ -6,6 +6,7 @@ export interface Product {
   sizes: string[]
   description?: string
   image_url?: string
+  stock: number
   active: boolean
   created_at: string
 }
