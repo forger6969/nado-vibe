@@ -48,6 +48,7 @@ export function ReviewForm({ order, onClose, onDone }: Props) {
     try {
       await createReview({
         order_id: order.id,
+        product_id: order.product_id,
         buyer_tg_id: user?.id ?? 0,
         rating,
         text: text.trim() || undefined,

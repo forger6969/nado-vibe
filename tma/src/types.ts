@@ -34,6 +34,7 @@ export interface Order {
 export interface Review {
   id: string
   order_id: string
+  product_id?: string
   buyer_tg_id: number
   rating: number
   text?: string

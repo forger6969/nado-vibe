@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Package, ClipboardList, Trash2, Edit2, ChevronDown, ShoppingBag, PackagePlus } from 'lucide-react'
+import { Plus, Package, ClipboardList, Trash2, Edit2, ChevronDown, ShoppingBag, PackagePlus, Star, BarChart2 } from 'lucide-react'
 import { getProducts, getOrders, deleteProduct, updateOrderStatus, shipOrder } from '../lib/supabase'
 import type { Product, Order, OrderStatus } from '../types'
 import { STATUS_LABELS, STATUS_COLORS } from '../types'
 import { ProductForm } from '../components/ProductForm'
 import { CourierForm } from '../components/CourierForm'
 import { RestockSheet } from '../components/RestockSheet'
+import { ReviewsTab } from '../components/ReviewsTab'
+import { AnalyticsTab } from '../components/AnalyticsTab'
 import { notifyClient } from '../lib/botNotify'
 
-type Tab = 'products' | 'orders'
+type Tab = 'products' | 'orders' | 'reviews' | 'analytics'
 
 const TMA_URL = import.meta.env.VITE_TMA_URL as string | undefined
 
@@ -150,28 +152,26 @@ export function AdminPanel() {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-0.5 no-scrollbar">
           {([
-            { key: 'products', label: 'Товары', icon: Package, badge: products.length },
+            { key: 'products', label: 'Товары', icon: Package, badge: 0 },
             { key: 'orders', label: 'Заказы', icon: ClipboardList, badge: newOrders },
+            { key: 'reviews', label: 'Отзывы', icon: Star, badge: 0 },
+            { key: 'analytics', label: 'Статистика', icon: BarChart2, badge: 0 },
           ] as const).map(({ key, label, icon: Icon, badge }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-full font-mono text-xs tracking-wide transition-all border ${
-                tab === key
-                  ? 'bg-white text-black border-white'
-                  : 'text-white/40 border-white/10'
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full font-mono text-xs tracking-wide transition-all border shrink-0 ${
+                tab === key ? 'bg-white text-black border-white' : 'text-white/40 border-white/10'
               }`}
             >
-              <Icon size={12} />
+              <Icon size={11} />
               {label}
               {badge > 0 && (
                 <span className={`text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center ${
                   tab === key ? 'bg-black text-white' : 'bg-white/10 text-white/60'
-                }`}>
-                  {badge}
-                </span>
+                }`}>{badge}</span>
               )}
             </button>
           ))}
@@ -192,8 +192,12 @@ export function AdminPanel() {
             onDelete={handleDelete}
             onRestock={p => setRestockProduct(p)}
           />
-        ) : (
+        ) : tab === 'orders' ? (
           <OrdersList groups={cartGroups} onStatusChange={handleStatusChange} />
+        ) : tab === 'reviews' ? (
+          <ReviewsTab />
+        ) : (
+          <AnalyticsTab />
         )}
       </div>
 
@@ -339,9 +343,14 @@ function OrdersList({ groups, onStatusChange }: {
                 <ShoppingBag size={12} className="text-white/40" />
               </div>
               <div>
-                <p className="font-mono text-white/20 text-[8px] tracking-[0.2em] uppercase">
-                  Корзина · {g.items.length} {g.items.length === 1 ? 'товар' : 'товара'}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="font-mono text-white/20 text-[8px] tracking-[0.2em] uppercase">
+                    Корзина · {g.items.length} {g.items.length === 1 ? 'товар' : 'товара'}
+                  </p>
+                  <span className="font-mono text-[9px] font-bold text-white/60 bg-white/8 px-1.5 py-0.5 rounded-md tracking-wider">
+                    #{g.cart_id.slice(0, 6).toUpperCase()}
+                  </span>
+                </div>
                 <p className="font-mono text-white/15 text-[8px]">{new Date(g.created_at).toLocaleString('ru')}</p>
               </div>
             </div>

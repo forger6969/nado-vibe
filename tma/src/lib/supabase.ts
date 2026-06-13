@@ -136,6 +136,86 @@ export async function getOrderReview(orderId: string): Promise<Review | null> {
   return data ?? null
 }
 
+export async function getProductReviews(productId: string): Promise<Review[]> {
+  const { data } = await supabase
+    .from('reviews')
+    .select('*')
+    .eq('product_id', productId)
+    .order('created_at', { ascending: false })
+    .limit(20)
+  return data ?? []
+}
+
+export interface ReviewWithOrder extends Review {
+  product_name?: string
+  size?: string
+  buyer_name?: string
+  buyer_username?: string
+}
+
+export async function getAllReviews(): Promise<ReviewWithOrder[]> {
+  const [{ data: reviews }, { data: orders }] = await Promise.all([
+    supabase.from('reviews').select('*').order('created_at', { ascending: false }),
+    supabase.from('orders').select('id, product_name, size, buyer_name, buyer_username'),
+  ])
+  const ordersMap = new Map((orders ?? []).map(o => [o.id, o]))
+  return (reviews ?? []).map(r => ({
+    ...r,
+    ...ordersMap.get(r.order_id),
+    id: r.id,
+    order_id: r.order_id,
+    created_at: r.created_at,
+  }))
+}
+
+export interface ProductStat {
+  product_id: string
+  product_name: string
+  orders: number
+  revenue: number
+  sizes: Record<string, number>
+  buyers: Set<number>
+}
+
+export async function getOrderStats() {
+  const { data } = await supabase
+    .from('orders')
+    .select('product_id, product_name, price, size, buyer_tg_id, status, created_at, cart_id')
+  const rows = data ?? []
+  const total = rows.filter(r => r.status !== 'cancelled')
+  const revenue = total.reduce((s, r) => s + (r.price ?? 0), 0)
+
+  const byProduct = new Map<string, ProductStat>()
+  for (const o of total) {
+    const s = byProduct.get(o.product_id) ?? {
+      product_id: o.product_id, product_name: o.product_name,
+      orders: 0, revenue: 0, sizes: {}, buyers: new Set<number>(),
+    }
+    s.orders++
+    s.revenue += o.price ?? 0
+    s.sizes[o.size] = (s.sizes[o.size] ?? 0) + 1
+    s.buyers.add(o.buyer_tg_id)
+    byProduct.set(o.product_id, s)
+  }
+
+  const byBuyer = new Map<number, { tg_id: number; orders: number; revenue: number }>()
+  for (const o of total) {
+    const b = byBuyer.get(o.buyer_tg_id) ?? { tg_id: o.buyer_tg_id, orders: 0, revenue: 0 }
+    b.orders++
+    b.revenue += o.price ?? 0
+    byBuyer.set(o.buyer_tg_id, b)
+  }
+
+  return {
+    totalRevenue: revenue,
+    totalOrders: total.length,
+    cancelled: rows.filter(r => r.status === 'cancelled').length,
+    avgOrder: total.length > 0 ? revenue / total.length : 0,
+    products: Array.from(byProduct.values()).sort((a, b) => b.revenue - a.revenue),
+    topBuyers: Array.from(byBuyer.values()).sort((a, b) => b.revenue - a.revenue).slice(0, 10),
+  }
+}
+
 export async function updateOrderStatus(id: string, status: OrderStatus): Promise<void> {
   const { error } = await supabase.from('orders').update({ status }).eq('id', id)
   if (error) throw error

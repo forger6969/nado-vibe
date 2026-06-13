@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, ShoppingCart, Check } from 'lucide-react'
-import type { Product } from '../types'
+import { X, ShoppingCart, Check, Star } from 'lucide-react'
+import type { Product, Review } from '../types'
 import { useCart } from '../context/CartContext'
 import { tg } from '../lib/tg'
+import { getProductReviews } from '../lib/supabase'
 
 interface Props {
   product: Product | null
@@ -14,6 +15,11 @@ export function ProductSheet({ product, onClose }: Props) {
   const { add } = useCart()
   const [selectedSize, setSelectedSize] = useState<string | null>(null)
   const [added, setAdded] = useState(false)
+  const [reviews, setReviews] = useState<Review[]>([])
+
+  useEffect(() => {
+    if (product) getProductReviews(product.id).then(setReviews)
+  }, [product?.id])
 
   const handleClose = () => {
     setSelectedSize(null)
@@ -152,6 +158,39 @@ export function ProductSheet({ product, onClose }: Props) {
                   )}
                 </AnimatePresence>
               </motion.button>
+            </div>
+
+              {/* Reviews */}
+              {reviews.length > 0 && (
+                <div className="mt-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <p className="font-mono text-white/30 text-[9px] tracking-[0.2em] uppercase">Отзывы</p>
+                    <span className="font-mono text-[9px] text-white/20">
+                      {(reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)} ★ · {reviews.length} шт
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    {reviews.slice(0, 5).map(r => (
+                      <div key={r.id} className="bg-white/3 rounded-2xl p-3">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex gap-0.5">
+                            {[1,2,3,4,5].map(s => (
+                              <Star key={s} size={10} fill={r.rating >= s ? '#fff' : 'transparent'} stroke={r.rating >= s ? '#fff' : 'rgba(255,255,255,0.2)'} />
+                            ))}
+                          </div>
+                          <p className="font-mono text-white/20 text-[8px]">
+                            {new Date(r.created_at).toLocaleDateString('ru', { day: 'numeric', month: 'short' })}
+                          </p>
+                        </div>
+                        {r.text && <p className="font-body text-white/50 text-xs leading-relaxed">{r.text}</p>}
+                        {r.photo_url && (
+                          <img src={r.photo_url} alt="review" className="mt-2 w-full max-h-32 object-cover rounded-xl" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         </>
