@@ -64,7 +64,7 @@ export function CTASection() {
           className="flex flex-col sm:flex-row items-center justify-center gap-4"
         >
           <a
-            href="https://t.me/nadovibe"
+            href="https://t.me/nado_vibe_bot"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary w-full sm:w-auto flex items-center justify-center gap-3 px-10 py-4 rounded-full text-sm font-semibold tracking-widest"

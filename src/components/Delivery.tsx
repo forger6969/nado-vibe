@@ -1,16 +1,16 @@
 import { motion, useReducedMotion } from 'framer-motion'
-import { MapPin, Zap, Shield, MessageCircle } from 'lucide-react'
+import { MapPin, Zap, ShoppingBag, CreditCard } from 'lucide-react'
 
 const steps = [
   {
-    icon: MessageCircle,
-    title: 'Напиши нам',
-    desc: 'В Instagram DIRECT или Telegram. Укажи модель, размер и адрес доставки.',
+    icon: ShoppingBag,
+    title: 'Открой бота',
+    desc: 'Нажми кнопку «Telegram бот» и выбери товары прямо в каталоге.',
   },
   {
-    icon: Shield,
-    title: 'Подтверждение',
-    desc: 'Менеджер подтверждает наличие и стоимость в течение часа.',
+    icon: CreditCard,
+    title: 'Оформи заказ',
+    desc: 'Укажи размер, адрес доставки и номер телефона — всё прямо в боте.',
   },
   {
     icon: Zap,

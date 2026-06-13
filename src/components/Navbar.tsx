@@ -48,7 +48,7 @@ export function Navbar() {
 
         {/* CTA */}
         <a
-          href="https://t.me/nadovibe"
+          href="https://t.me/nado_vibe_bot"
           target="_blank"
           rel="noopener noreferrer"
           className="hidden md:flex items-center gap-2 btn-primary text-sm px-5 py-2.5 rounded-full"
@@ -83,7 +83,7 @@ export function Navbar() {
             </a>
           ))}
           <a
-            href="https://t.me/nadovibe"
+            href="https://t.me/nado_vibe_bot"
             target="_blank"
             rel="noopener noreferrer"
             className="btn-primary text-center py-3 rounded-full text-sm"

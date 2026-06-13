@@ -137,7 +137,7 @@ export function Hero() {
             </motion.span>
           </motion.a>
           <motion.a
-            href="https://t.me/nadovibe"
+            href="https://t.me/nado_vibe_bot"
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ scale: reduced ? 1 : 1.03, y: reduced ? 0 : -2 }}
