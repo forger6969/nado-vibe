@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #000;
+    color: #fff;
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+    min-height: 100dvh;
+  }
+  #root { min-height: 100dvh; }
+  ::selection { background: #fff; color: #000; }
+}
+
+@layer utilities {
+  .card-dark { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); }
+  .card-dark-hover { transition: background 0.2s, border-color 0.2s; }
+  .card-dark-hover:active { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.15); }
+  .text-muted { color: rgba(255,255,255,0.45); }
+  .text-faint { color: rgba(255,255,255,0.25); }
+  .border-subtle { border-color: rgba(255,255,255,0.08); }
+  .font-display { font-family: 'Unbounded', sans-serif; }
+  .font-mono { font-family: 'Space Mono', monospace; }
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 20px); }
+}

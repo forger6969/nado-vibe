@@ -1,0 +1,66 @@
+import { createClient } from '@supabase/supabase-js'
+import type { Product, Order, OrderStatus } from '../types'
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? ''
+const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_ANON_KEY ?? ''
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON)
+
+// ── Products ──────────────────────────────────────────────────────────────────
+
+export async function getProducts(activeOnly = true): Promise<Product[]> {
+  let q = supabase.from('products').select('*').order('created_at', { ascending: false })
+  if (activeOnly) q = q.eq('active', true)
+  const { data, error } = await q
+  if (error) throw error
+  return data ?? []
+}
+
+export async function createProduct(p: Omit<Product, 'id' | 'created_at'>): Promise<Product> {
+  const { data, error } = await supabase.from('products').insert(p).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function updateProduct(id: string, p: Partial<Product>): Promise<void> {
+  const { error } = await supabase.from('products').update(p).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  const { error } = await supabase.from('products').delete().eq('id', id)
+  if (error) throw error
+}
+
+// ── Orders ────────────────────────────────────────────────────────────────────
+
+export async function getOrders(): Promise<Order[]> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
+export async function createOrder(o: Omit<Order, 'id' | 'created_at' | 'status'>): Promise<Order> {
+  const { data, error } = await supabase
+    .from('orders')
+    .insert({ ...o, status: 'new' })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateOrderStatus(id: string, status: OrderStatus): Promise<void> {
+  const { error } = await supabase.from('orders').update({ status }).eq('id', id)
+  if (error) throw error
+}
+
+// ── Admins ────────────────────────────────────────────────────────────────────
+
+export async function isAdmin(tgId: number): Promise<boolean> {
+  const { data } = await supabase.from('admins').select('tg_id').eq('tg_id', tgId).single()
+  return !!data
+}
