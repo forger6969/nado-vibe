@@ -76,6 +76,7 @@ export function CartCheckoutForm({ onClose }: Props) {
         product_id: item.product.id,
         product_name: item.product.name,
         size: item.size,
+        qty: item.qty,
         buyer_tg_id: user?.id ?? 0,
         buyer_name: name.trim() || undefined,
         buyer_username: user?.username,

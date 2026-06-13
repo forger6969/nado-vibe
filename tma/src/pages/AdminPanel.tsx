@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Package, ClipboardList, Trash2, Edit2, ChevronDown, ShoppingBag, PackagePlus, Star, BarChart2 } from 'lucide-react'
-import { getProducts, getOrders, deleteProduct, updateOrderStatus, shipOrder } from '../lib/supabase'
+import { Plus, Package, ClipboardList, Trash2, Edit2, ShoppingBag, PackagePlus, Star, BarChart2, Truck, CheckCircle, XCircle } from 'lucide-react'
+import { getProducts, getOrders, deleteProduct, updateOrderStatus, shipOrder, cancelCartOrders } from '../lib/supabase'
 import type { Product, Order, OrderStatus } from '../types'
-import { STATUS_LABELS, STATUS_COLORS } from '../types'
 import { ProductForm } from '../components/ProductForm'
 import { CourierForm } from '../components/CourierForm'
 import { RestockSheet } from '../components/RestockSheet'
@@ -89,12 +88,19 @@ export function AdminPanel() {
     setProducts(prev => prev.filter(p => p.id !== id))
   }
 
+  const handleCancel = async (group: CartGroup) => {
+    if (!confirm(`Отменить заказ #${group.cart_id.slice(0, 6).toUpperCase()}? Товары вернутся на склад.`)) return
+    await cancelCartOrders(group.items.map(o => o.id))
+    setOrders(prev => prev.map(o =>
+      group.items.some(gi => gi.id === o.id) ? { ...o, status: 'cancelled' } : o
+    ))
+  }
+
   const handleStatusChange = async (group: CartGroup, status: OrderStatus) => {
     if (status === 'shipped') {
       setCourierGroup(group)
       return
     }
-    // Apply status to all items in the cart
     await Promise.all(group.items.map(o => updateOrderStatus(o.id, status)))
     setOrders(prev => prev.map(o =>
       group.items.some(gi => gi.id === o.id) ? { ...o, status } : o
@@ -193,7 +199,7 @@ export function AdminPanel() {
             onRestock={p => setRestockProduct(p)}
           />
         ) : tab === 'orders' ? (
-          <OrdersList groups={cartGroups} onStatusChange={handleStatusChange} />
+          <OrdersList groups={cartGroups} onStatusChange={handleStatusChange} onCancel={handleCancel} />
         ) : tab === 'reviews' ? (
           <ReviewsTab />
         ) : (
@@ -313,12 +319,11 @@ function ProductsList({ products, onEdit, onDelete, onRestock }: {
   )
 }
 
-function OrdersList({ groups, onStatusChange }: {
+function OrdersList({ groups, onStatusChange, onCancel }: {
   groups: CartGroup[]
   onStatusChange: (group: CartGroup, status: OrderStatus) => void
+  onCancel: (group: CartGroup) => void
 }) {
-  const statuses: OrderStatus[] = ['new', 'processing', 'shipped', 'delivered', 'cancelled']
-
   if (groups.length === 0) {
     return (
       <div className="text-center py-16">
@@ -385,21 +390,61 @@ function OrdersList({ groups, onStatusChange }: {
             )}
           </div>
 
-          {/* Status select */}
-          <div className="relative">
-            <select
-              value={g.status}
-              onChange={e => onStatusChange(g, e.target.value as OrderStatus)}
-              className={`w-full appearance-none font-mono text-xs px-3 py-2 rounded-xl border-0 outline-none cursor-pointer ${STATUS_COLORS[g.status]}`}
-            >
-              {statuses.map(s => (
-                <option key={s} value={s} className="bg-[#111] text-white">
-                  {STATUS_LABELS[s]}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-current opacity-50 pointer-events-none" />
-          </div>
+          {/* Status actions */}
+          {g.status === 'new' && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => onStatusChange(g, 'processing')}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-white/10 text-white font-display font-semibold text-xs tracking-wide py-3 rounded-xl active:bg-white/20 transition-colors"
+              >
+                <CheckCircle size={13} /> Принять
+              </button>
+              <button
+                onClick={() => onCancel(g)}
+                className="w-12 flex items-center justify-center border border-red-500/25 text-red-400 rounded-xl active:bg-red-500/10 transition-colors"
+              >
+                <XCircle size={14} />
+              </button>
+            </div>
+          )}
+          {g.status === 'processing' && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => onStatusChange(g, 'shipped')}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-blue-500/20 text-blue-300 font-display font-semibold text-xs tracking-wide py-3 rounded-xl active:bg-blue-500/30 transition-colors"
+              >
+                <Truck size={13} /> Отправить
+              </button>
+              <button
+                onClick={() => onCancel(g)}
+                className="w-12 flex items-center justify-center border border-red-500/25 text-red-400 rounded-xl active:bg-red-500/10 transition-colors"
+              >
+                <XCircle size={14} />
+              </button>
+            </div>
+          )}
+          {g.status === 'shipped' && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => onStatusChange(g, 'delivered')}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-green-500/15 text-green-400 font-display font-semibold text-xs tracking-wide py-3 rounded-xl active:bg-green-500/25 transition-colors"
+              >
+                <CheckCircle size={13} /> Доставлен
+              </button>
+              <button
+                onClick={() => onCancel(g)}
+                className="w-12 flex items-center justify-center border border-red-500/25 text-red-400 rounded-xl active:bg-red-500/10 transition-colors"
+              >
+                <XCircle size={14} />
+              </button>
+            </div>
+          )}
+          {g.status === 'delivered' && (
+            <p className="font-mono text-green-400/50 text-[9px] text-center tracking-wider">✓ ДОСТАВЛЕН · {g.confirmed ? 'Подтверждён клиентом' : 'Ожидает подтверждения'}</p>
+          )}
+          {g.status === 'cancelled' && (
+            <p className="font-mono text-red-400/40 text-[9px] text-center tracking-wider">✗ ОТМЕНЁН · Товары возвращены на склад</p>
+          )}
         </motion.div>
       ))}
     </div>

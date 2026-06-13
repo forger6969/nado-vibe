@@ -221,6 +221,38 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
   if (error) throw error
 }
 
+export async function cancelCartOrders(orderIds: string[]): Promise<void> {
+  const { data: orders } = await supabase
+    .from('orders')
+    .select('id, product_id, size, qty, status')
+    .in('id', orderIds)
+
+  const toRestore = (orders ?? []).filter(o => o.status !== 'cancelled')
+
+  if (toRestore.length > 0) {
+    const byProduct = new Map<string, { size: string; qty: number }[]>()
+    for (const o of toRestore) {
+      const arr = byProduct.get(o.product_id) ?? []
+      arr.push({ size: o.size as string, qty: (o.qty as number) ?? 1 })
+      byProduct.set(o.product_id, arr)
+    }
+    await Promise.allSettled(
+      Array.from(byProduct.entries()).map(async ([productId, sizes]) => {
+        const { data: p } = await supabase.from('products').select('sizes_stock,stock').eq('id', productId).single()
+        if (!p) return
+        const stock: Record<string, number> = { ...(p.sizes_stock as Record<string, number> ?? {}) }
+        for (const { size, qty } of sizes) {
+          stock[size] = (stock[size] ?? 0) + qty
+        }
+        const total = Object.values(stock).reduce((a, b) => a + b, 0)
+        await supabase.from('products').update({ sizes_stock: stock, stock: total }).eq('id', productId)
+      })
+    )
+  }
+
+  await supabase.from('orders').update({ status: 'cancelled' }).in('id', orderIds)
+}
+
 // ── Storage ───────────────────────────────────────────────────────────────────
 
 export async function uploadProductImage(file: File): Promise<string> {

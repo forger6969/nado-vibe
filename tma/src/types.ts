@@ -24,6 +24,7 @@ export interface Order {
   address: string
   status: 'new' | 'processing' | 'shipped' | 'delivered' | 'cancelled'
   price: number
+  qty?: number
   cart_id?: string
   courier_name?: string
   courier_phone?: string
