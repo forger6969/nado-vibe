@@ -1,1 +1,1 @@
-ALTER TABLE reviews ADD COLUMN IF NOT EXISTS product_id TEXT REFERENCES products(id);
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS product_id UUID REFERENCES products(id);
